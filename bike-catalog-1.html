@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Moto Catalog</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#121316;
+    --surface:#1B1D22;
+    --surface-2:#22252B;
+    --border:#2C2F36;
+    --text:#F2F1ED;
+    --muted:#8B8F98;
+    --accent:#E8502A;
+    --accent-dim:#5A2216;
+    --gauge:#D9A73B;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+  }
+  .mono{font-family:'JetBrains Mono',monospace;}
+  .display{font-family:'Oswald',sans-serif;}
+
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:20px 28px;
+    border-bottom:1px solid var(--border);
+    position:sticky; top:0; background:var(--bg); z-index:10;
+  }
+  header h1{
+    font-family:'Oswald',sans-serif; font-weight:600; font-size:22px;
+    letter-spacing:0.5px; text-transform:uppercase;
+  }
+  header h1 span{color:var(--accent);}
+  header .count{
+    font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--muted);
+    margin-left:12px;
+  }
+  .add-btn{
+    background:var(--accent); color:#fff; border:none;
+    padding:10px 18px; border-radius:4px; font-weight:600; font-size:14px;
+    cursor:pointer; font-family:'Inter',sans-serif;
+    box-shadow:0 0 0 rgba(232,80,42,0.5); transition:box-shadow .2s, transform .1s;
+  }
+  .add-btn:hover{box-shadow:0 0 18px rgba(232,80,42,0.55); transform:translateY(-1px);}
+
+  .layout{display:flex; max-width:1280px; margin:0 auto;}
+
+  aside{
+    width:260px; min-width:260px; padding:24px 20px;
+    border-right:1px solid var(--border);
+    height:calc(100vh - 73px); overflow-y:auto; position:sticky; top:73px;
+  }
+  .filter-group{margin-bottom:26px;}
+  .filter-group > h3{
+    font-family:'Oswald',sans-serif; font-size:13px; letter-spacing:1px;
+    text-transform:uppercase; color:var(--muted); margin-bottom:12px;
+    border-bottom:1px solid var(--border); padding-bottom:6px;
+  }
+  .subgroup{margin-bottom:14px;}
+  .subgroup > .sublabel{
+    font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--gauge);
+    text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; display:block;
+  }
+  .check-row{
+    display:flex; align-items:center; gap:8px; padding:4px 0; cursor:pointer;
+    font-size:13.5px; color:var(--text);
+  }
+  .check-row input{accent-color:var(--accent); width:14px; height:14px; cursor:pointer;}
+  .check-row:hover{color:var(--accent);}
+  .check-row.checked{color:var(--accent); text-shadow:0 0 8px rgba(232,80,42,0.4);}
+  .clear-btn{
+    background:none; border:1px solid var(--border); color:var(--muted);
+    font-size:12px; padding:6px 10px; border-radius:4px; cursor:pointer; margin-top:4px;
+  }
+  .clear-btn:hover{border-color:var(--accent); color:var(--accent);}
+
+  main{flex:1; padding:24px 28px;}
+  .grid{
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:18px;
+  }
+  .card{
+    background:var(--surface); border:1px solid var(--border); border-radius:6px;
+    overflow:hidden; display:flex; flex-direction:column;
+    transition:border-color .15s, transform .15s;
+  }
+  .card:hover{border-color:var(--accent); transform:translateY(-2px);}
+  .card .img-wrap{
+    width:100%; aspect-ratio:4/3; background:var(--surface-2);
+    display:flex; align-items:center; justify-content:center; overflow:hidden;
+  }
+  .card .img-wrap img{width:100%; height:100%; object-fit:cover;}
+  .card .img-wrap .placeholder{color:var(--muted); font-size:12px; font-family:'JetBrains Mono',monospace;}
+  .card .info{padding:12px 14px;}
+  .card .name{font-family:'Oswald',sans-serif; font-size:16px; font-weight:500; margin-bottom:6px;}
+  .card .tags{display:flex; flex-wrap:wrap; gap:6px; align-items:center;}
+  .tag{
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; padding:3px 7px;
+    border-radius:3px; background:var(--surface-2); color:var(--muted); border:1px solid var(--border);
+  }
+  .tag.cc{color:var(--gauge); border-color:rgba(217,167,59,0.3);}
+  .tag.brand{color:var(--text);}
+  .card .del{
+    margin-top:10px; background:none; border:none; color:var(--muted);
+    font-size:11px; cursor:pointer; text-decoration:underline; padding:0;
+  }
+  .card .del:hover{color:var(--accent);}
+
+  .empty{
+    text-align:center; padding:80px 20px; color:var(--muted);
+  }
+  .empty h2{font-family:'Oswald',sans-serif; color:var(--text); font-size:20px; margin-bottom:8px;}
+  .empty button{margin-top:16px;}
+
+  /* Modal */
+  .overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,0.6);
+    display:none; align-items:center; justify-content:center; z-index:100; padding:20px;
+  }
+  .overlay.open{display:flex;}
+  .modal{
+    background:var(--surface); border:1px solid var(--border); border-radius:8px;
+    width:100%; max-width:420px; padding:24px; max-height:90vh; overflow-y:auto;
+  }
+  .modal h2{font-family:'Oswald',sans-serif; font-size:18px; margin-bottom:18px; text-transform:uppercase; letter-spacing:0.5px;}
+  .field{margin-bottom:16px;}
+  .field label{display:block; font-size:12px; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; font-family:'JetBrains Mono',monospace;}
+  .field input[type=text], .field select{
+    width:100%; padding:9px 10px; background:var(--surface-2); border:1px solid var(--border);
+    color:var(--text); border-radius:4px; font-size:14px; font-family:'Inter',sans-serif;
+  }
+  .field input[type=text]:focus, .field select:focus{outline:none; border-color:var(--accent);}
+  .img-upload{
+    border:1px dashed var(--border); border-radius:4px; padding:16px; text-align:center;
+    cursor:pointer; color:var(--muted); font-size:13px;
+  }
+  .img-upload:hover{border-color:var(--accent); color:var(--accent);}
+  .img-preview{width:100%; max-height:160px; object-fit:cover; border-radius:4px; margin-top:10px;}
+  .modal-actions{display:flex; gap:10px; margin-top:20px;}
+  .modal-actions button{
+    flex:1; padding:11px; border-radius:4px; font-weight:600; cursor:pointer; font-size:14px;
+    font-family:'Inter',sans-serif; border:none;
+  }
+  .btn-save{background:var(--accent); color:#fff;}
+  .btn-cancel{background:none; border:1px solid var(--border); color:var(--muted);}
+  .btn-cancel:hover{color:var(--text);}
+  .field-error{color:var(--accent); font-size:12px; margin-top:6px; display:none;}
+
+  .mobile-filter-btn{display:none;}
+
+  @media (max-width:860px){
+    .layout{flex-direction:column;}
+    aside{
+      position:fixed; top:0; left:0; height:100vh; width:280px; z-index:90;
+      transform:translateX(-100%); transition:transform .2s; background:var(--bg);
+    }
+    aside.open{transform:translateX(0);}
+    .mobile-filter-btn{
+      display:block; background:var(--surface-2); border:1px solid var(--border); color:var(--text);
+      padding:9px 14px; border-radius:4px; font-size:13px; cursor:pointer; margin:16px 28px 0;
+    }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Moto<span>Catalog</span><span class="count mono" id="resultCount"></span></h1>
+  <button class="add-btn" id="openAdd">+ Add bike</button>
+</header>
+
+<button class="mobile-filter-btn" id="toggleFilters">Filters</button>
+
+<div class="layout">
+  <aside id="sidebar">
+    <div class="filter-group">
+      <h3>Body Type</h3>
+      <div class="subgroup">
+        <span class="sublabel">Retro</span>
+        <div id="body-retro"></div>
+      </div>
+      <div class="subgroup">
+        <span class="sublabel">Sports</span>
+        <div id="body-sports"></div>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <h3>Engine Size</h3>
+      <div class="subgroup">
+        <span class="sublabel">Commuter</span>
+        <div id="cc-commuter"></div>
+      </div>
+      <div class="subgroup">
+        <span class="sublabel">Lightweight</span>
+        <div id="cc-lightweight"></div>
+      </div>
+      <div class="subgroup">
+        <span class="sublabel">Middleweight</span>
+        <div id="cc-middleweight"></div>
+      </div>
+      <div class="subgroup">
+        <span class="sublabel">Heavyweight</span>
+        <div id="cc-heavyweight"></div>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <h3>Brand</h3>
+      <div id="brand-list"></div>
+    </div>
+
+    <button class="clear-btn" id="clearFilters">Clear all filters</button>
+  </aside>
+
+  <main>
+    <div class="grid" id="grid"></div>
+    <div class="empty" id="emptyState" style="display:none;">
+      <h2 id="emptyTitle">No bikes yet</h2>
+      <p id="emptyText">Add your first bike to start building the catalog.</p>
+      <button class="add-btn" id="emptyAddBtn">+ Add bike</button>
+    </div>
+  </main>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2>Add a bike</h2>
+    <div class="field">
+      <label>Name</label>
+      <input type="text" id="f-name" placeholder="e.g. Duke 390">
+    </div>
+    <div class="field">
+      <label>Body type</label>
+      <select id="f-body"></select>
+    </div>
+    <div class="field">
+      <label>Engine size (cc)</label>
+      <select id="f-cc"></select>
+    </div>
+    <div class="field">
+      <label>Brand</label>
+      <select id="f-brand"></select>
+    </div>
+    <div class="field">
+      <label>Photo</label>
+      <div class="img-upload" id="uploadZone">Click to upload a photo</div>
+      <input type="file" id="f-image" accept="image/*" style="display:none;">
+      <img id="imgPreview" class="img-preview" style="display:none;">
+    </div>
+    <div class="field-error" id="formError">Please fill in the bike's name and photo.</div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="cancelAdd">Cancel</button>
+      <button class="btn-save" id="saveBike">Save bike</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const BODY_TYPES = {
+  Retro: ["Cruiser","Standard","Cafe Racer","Scrambler"],
+  Sports: ["Supersport / Super","Naked","Dual Sport / Adventure","Special bike"]
+};
+const ENGINE_GROUPS = {
+  Commuter: [100,110,150,160,180,200,250],
+  Lightweight: [250,300,350,400,450,500],
+  Middleweight: ["600-699","700-799","800-899","900-990"],
+  Heavyweight: ["1000-1100","1100-1400","1400+"]
+};
+const BRANDS = ["Honda","Kawasaki","Yamaha","Suzuki","Triumph","Ducati","Aprilia","KTM","BMW","MV Agusta","Norton","BSA","Royal Enfield","Harley Davidson","Husqvarna","Bajaj","TVS","Hero","Jawa"];
+
+let bikes = [];
+let filters = { body:new Set(), cc:new Set(), brand:new Set() };
+
+function ccLabel(v){ return typeof v === "number" ? v + "cc" : v + "cc"; }
+
+// ---- Build sidebar ----
+function buildCheckList(container, values, filterKey, labelFn){
+  const el = document.getElementById(container);
+  values.forEach(v => {
+    const label = labelFn ? labelFn(v) : v;
+    const row = document.createElement("label");
+    row.className = "check-row";
+    row.innerHTML = `<input type="checkbox" value="${v}"> <span>${label}</span>`;
+    row.querySelector("input").addEventListener("change", (e) => {
+      if(e.target.checked) filters[filterKey].add(String(v));
+      else filters[filterKey].delete(String(v));
+      row.classList.toggle("checked", e.target.checked);
+      render();
+    });
+    el.appendChild(row);
+  });
+}
+buildCheckList("body-retro", BODY_TYPES.Retro, "body");
+buildCheckList("body-sports", BODY_TYPES.Sports, "body");
+buildCheckList("cc-commuter", ENGINE_GROUPS.Commuter, "cc", ccLabel);
+buildCheckList("cc-lightweight", ENGINE_GROUPS.Lightweight, "cc", ccLabel);
+buildCheckList("cc-middleweight", ENGINE_GROUPS.Middleweight, "cc", ccLabel);
+buildCheckList("cc-heavyweight", ENGINE_GROUPS.Heavyweight, "cc", ccLabel);
+buildCheckList("brand-list", BRANDS, "brand");
+
+document.getElementById("clearFilters").addEventListener("click", () => {
+  filters = { body:new Set(), cc:new Set(), brand:new Set() };
+  document.querySelectorAll("aside input[type=checkbox]").forEach(cb => {
+    cb.checked = false;
+    cb.closest(".check-row").classList.remove("checked");
+  });
+  render();
+});
+
+// ---- Populate modal selects ----
+function fillSelect(id, groups){
+  const sel = document.getElementById(id);
+  Object.entries(groups).forEach(([groupName, items]) => {
+    const og = document.createElement("optgroup");
+    og.label = groupName;
+    items.forEach(v => {
+      const opt = document.createElement("option");
+      opt.value = typeof v === "number" ? v+"cc" : (id === "f-cc" ? v+"cc" : v);
+      opt.textContent = id === "f-cc" ? ccLabel(v) : v;
+      og.appendChild(opt);
+    });
+    sel.appendChild(og);
+  });
+}
+fillSelect("f-body", BODY_TYPES);
+fillSelect("f-cc", ENGINE_GROUPS);
+BRANDS.forEach(b => {
+  const opt = document.createElement("option");
+  opt.value = b; opt.textContent = b;
+  document.getElementById("f-brand").appendChild(opt);
+});
+
+// ---- Storage ----
+// Uses localStorage since this page runs as a standalone file in your browser
+// (bikes are saved on this device/browser only).
+async function loadBikes(){
+  try{
+    const raw = localStorage.getItem("moto-catalog-bikes");
+    bikes = raw ? JSON.parse(raw) : [];
+  }catch(e){
+    console.error("Storage error", e);
+    bikes = [];
+  }
+  render();
+}
+async function saveBikes(){
+  try{
+    localStorage.setItem("moto-catalog-bikes", JSON.stringify(bikes));
+  }catch(e){
+    console.error("Storage error", e);
+    alert("Couldn't save — your browser storage may be full (large photos take up space).");
+  }
+}
+
+// ---- Render ----
+function render(){
+  const grid = document.getElementById("grid");
+  const empty = document.getElementById("emptyState");
+  grid.innerHTML = "";
+
+  const filtered = bikes.filter(b => {
+    if(filters.body.size && !filters.body.has(b.body)) return false;
+    if(filters.cc.size && !filters.cc.has(b.cc)) return false;
+    if(filters.brand.size && !filters.brand.has(b.brand)) return false;
+    return true;
+  });
+
+  document.getElementById("resultCount").textContent = bikes.length ? `${filtered.length}/${bikes.length}` : "";
+
+  if(bikes.length === 0){
+    empty.style.display = "block";
+    document.getElementById("emptyTitle").textContent = "No bikes yet";
+    document.getElementById("emptyText").textContent = "Add your first bike to start building the catalog.";
+    document.getElementById("emptyAddBtn").style.display = "inline-block";
+    return;
+  }
+  if(filtered.length === 0){
+    empty.style.display = "block";
+    document.getElementById("emptyTitle").textContent = "No matches";
+    document.getElementById("emptyText").textContent = "No bikes match the selected filters.";
+    document.getElementById("emptyAddBtn").style.display = "none";
+    return;
+  }
+  empty.style.display = "none";
+
+  filtered.forEach(b => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <div class="img-wrap">
+        ${b.image ? `<img src="${b.image}" alt="${b.name}">` : `<span class="placeholder">no photo</span>`}
+      </div>
+      <div class="info">
+        <div class="name">${b.name}</div>
+        <div class="tags">
+          <span class="tag">${b.body}</span>
+          <span class="tag cc">${b.cc}</span>
+          <span class="tag brand">${b.brand}</span>
+        </div>
+        <button class="del" data-id="${b.id}">Remove</button>
+      </div>
+    `;
+    card.querySelector(".del").addEventListener("click", async (e) => {
+      bikes = bikes.filter(x => x.id !== e.target.dataset.id);
+      await saveBikes();
+      render();
+    });
+    grid.appendChild(card);
+  });
+}
+
+// ---- Modal ----
+const overlay = document.getElementById("overlay");
+function openModal(){
+  document.getElementById("f-name").value = "";
+  document.getElementById("f-image").value = "";
+  document.getElementById("imgPreview").style.display = "none";
+  document.getElementById("imgPreview").src = "";
+  document.getElementById("formError").style.display = "none";
+  overlay.classList.add("open");
+}
+function closeModal(){ overlay.classList.remove("open"); }
+
+document.getElementById("openAdd").addEventListener("click", openModal);
+document.getElementById("emptyAddBtn").addEventListener("click", openModal);
+document.getElementById("cancelAdd").addEventListener("click", closeModal);
+overlay.addEventListener("click", (e) => { if(e.target === overlay) closeModal(); });
+
+document.getElementById("uploadZone").addEventListener("click", () => document.getElementById("f-image").click());
+document.getElementById("f-image").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const preview = document.getElementById("imgPreview");
+    preview.src = reader.result;
+    preview.style.display = "block";
+  };
+  reader.readAsDataURL(file);
+});
+
+document.getElementById("saveBike").addEventListener("click", async () => {
+  const name = document.getElementById("f-name").value.trim();
+  const body = document.getElementById("f-body").value;
+  const cc = document.getElementById("f-cc").value;
+  const brand = document.getElementById("f-brand").value;
+  const image = document.getElementById("imgPreview").src && document.getElementById("imgPreview").style.display !== "none"
+    ? document.getElementById("imgPreview").src : null;
+
+  if(!name){
+    const err = document.getElementById("formError");
+    err.textContent = "Please enter a bike name.";
+    err.style.display = "block";
+    return;
+  }
+
+  const bike = { id: Date.now().toString(36)+Math.random().toString(36).slice(2), name, body, cc, brand, image };
+  bikes.push(bike);
+  await saveBikes();
+  closeModal();
+  render();
+});
+
+// ---- Mobile filter toggle ----
+document.getElementById("toggleFilters").addEventListener("click", () => {
+  document.getElementById("sidebar").classList.toggle("open");
+});
+
+loadBikes();
+</script>
+</body>
+</html>
