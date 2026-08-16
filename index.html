@@ -511,7 +511,7 @@ async function loadBikes(){
       body: row["Body type"],
       cc: row["Engine size"],
       brand: row["Brand name"],
-      images: row["images"] ? row["images"].split(',').filter(Boolean) : [],
+      Images: row["Images"] ? row["Images"].split(',').filter(Boolean) : [],
       power: row["Power"],
       torque: row["Torque"],
       topSpeed: row["Top speed"],
@@ -581,7 +581,7 @@ function render(){
   empty.style.display = "none";
 
   filtered.forEach(b => {
-    const imgs = b.images && b.images.length ? b.images : (b.image ? [b.image] : []);
+    const imgs = b.Images && b.Images.length ? b.Images : (b.image ? [b.image] : []);
     const card = document.createElement("div");
     card.className = "card";
     card.innerHTML = `
@@ -634,7 +634,7 @@ const detailOverlay = document.getElementById("detailOverlay");
 function openDetail(id){
   const b = bikes.find(x => x.id === id);
   if(!b) return;
-  const imgs = b.images && b.images.length ? b.images : (b.image ? [b.image] : []);
+  const imgs = b.Images && b.Images.length ? b.Images : (b.image ? [b.image] : []);
   document.getElementById("detailContent").innerHTML = `
     <div class="detail-gallery">
       ${imgs.length ? imgs.map(src => `<img src="${src}">`).join("") : `<span class="placeholder">no photos</span>`}
@@ -679,7 +679,7 @@ document.getElementById("compareGoBtn").addEventListener("click", () => {
   const selected = bikes.filter(b => compareSet.has(b.id));
   if(selected.length < 2){ alert("Select at least 2 bikes to compare."); return; }
   const rows = [
-    ["Photo", b => { const imgs = b.images && b.images.length ? b.images : (b.image ? [b.image] : []); return imgs[0] ? `<img src="${imgs[0]}">` : "no photo"; }],
+    ["Photo", b => { const imgs = b.Images && b.Images.length ? b.Images : (b.image ? [b.image] : []); return imgs[0] ? `<img src="${imgs[0]}">` : "no photo"; }],
     ["Body type", b => b.body],
     ["Engine size", b => b.cc],
     ["Brand", b => b.brand],
@@ -773,7 +773,7 @@ document.getElementById("saveBike").addEventListener("click", async () => {
       "Body type": body,
       "Engine size": cc,
       "Brand name": brand,
-      "images": urls.join(','),
+      "Images": urls.join(','),
       "Power": power || null,
       "Torque": torque || null,
       "Top speed": topSpeed || null,
