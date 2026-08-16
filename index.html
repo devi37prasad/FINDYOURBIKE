@@ -59,12 +59,18 @@
     border-right:1px solid var(--border);
     height:calc(100vh - 73px); overflow-y:auto; position:sticky; top:73px;
   }
-  .filter-group{margin-bottom:26px;}
+  .filter-group{margin-bottom:10px;}
   .filter-group > h3{
     font-family:'Oswald',sans-serif; font-size:13px; letter-spacing:1px;
-    text-transform:uppercase; color:var(--muted); margin-bottom:12px;
-    border-bottom:1px solid var(--border); padding-bottom:6px;
+    text-transform:uppercase; color:var(--muted); margin-bottom:0;
+    border-bottom:1px solid var(--border); padding:10px 2px;
+    display:flex; align-items:center; justify-content:space-between; cursor:pointer;
   }
+  .filter-group > h3:hover{color:var(--accent);}
+  .filter-group > h3 .chev{transition:transform .15s; font-size:11px;}
+  .filter-group.open > h3 .chev{transform:rotate(180deg);}
+  .filter-group .group-content{display:none; padding-top:12px;}
+  .filter-group.open .group-content{display:block;}
   .subgroup{margin-bottom:14px;}
   .subgroup > .sublabel{
     font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--gauge);
@@ -241,40 +247,59 @@
       <button class="sidebar-close" id="closeFilters">✕</button>
     </div>
     <div class="filter-group">
-      <h3>Body Type</h3>
-      <div class="subgroup">
-        <span class="sublabel">Retro</span>
-        <div id="body-retro"></div>
-      </div>
-      <div class="subgroup">
-        <span class="sublabel">Sports</span>
-        <div id="body-sports"></div>
-      </div>
-    </div>
-
-    <div class="filter-group">
-      <h3>Engine Size</h3>
-      <div class="subgroup">
-        <span class="sublabel">Commuter</span>
-        <div id="cc-commuter"></div>
-      </div>
-      <div class="subgroup">
-        <span class="sublabel">Lightweight</span>
-        <div id="cc-lightweight"></div>
-      </div>
-      <div class="subgroup">
-        <span class="sublabel">Middleweight</span>
-        <div id="cc-middleweight"></div>
-      </div>
-      <div class="subgroup">
-        <span class="sublabel">Heavyweight</span>
-        <div id="cc-heavyweight"></div>
+      <h3>Body Type <span class="chev">▾</span></h3>
+      <div class="group-content">
+        <div class="subgroup">
+          <span class="sublabel">Retro</span>
+          <div id="body-retro"></div>
+        </div>
+        <div class="subgroup">
+          <span class="sublabel">Sports</span>
+          <div id="body-sports"></div>
+        </div>
       </div>
     </div>
 
     <div class="filter-group">
-      <h3>Brand</h3>
-      <div id="brand-list"></div>
+      <h3>Engine Size <span class="chev">▾</span></h3>
+      <div class="group-content">
+        <div class="subgroup">
+          <span class="sublabel">Commuter</span>
+          <div id="cc-commuter"></div>
+        </div>
+        <div class="subgroup">
+          <span class="sublabel">Lightweight</span>
+          <div id="cc-lightweight"></div>
+        </div>
+        <div class="subgroup">
+          <span class="sublabel">Middleweight</span>
+          <div id="cc-middleweight"></div>
+        </div>
+        <div class="subgroup">
+          <span class="sublabel">Heavyweight</span>
+          <div id="cc-heavyweight"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <h3>Power <span class="chev">▾</span></h3>
+      <div class="group-content"><div id="power-list"></div></div>
+    </div>
+
+    <div class="filter-group">
+      <h3>Torque <span class="chev">▾</span></h3>
+      <div class="group-content"><div id="torque-list"></div></div>
+    </div>
+
+    <div class="filter-group">
+      <h3>Top Speed <span class="chev">▾</span></h3>
+      <div class="group-content"><div id="topspeed-list"></div></div>
+    </div>
+
+    <div class="filter-group">
+      <h3>Brand <span class="chev">▾</span></h3>
+      <div class="group-content"><div id="brand-list"></div></div>
     </div>
 
     <button class="clear-btn" id="clearFilters">Clear all filters</button>
@@ -357,15 +382,18 @@ const BODY_TYPES = {
   Sports: ["Supersport / Super","Naked","Dual Sport / Adventure","Special bike"]
 };
 const ENGINE_GROUPS = {
-  Commuter: ["100","125","150-200","200-250"],
-  Lightweight: ["250-300","300-400","400-500"],
+  Commuter: ["100",125","150-199","200-249"],
+  Lightweight: ["250-299","300-390","400-500"],
   Middleweight: ["600-699","700-799","800-899","900-990"],
   Heavyweight: ["1000-1100","1100-1400","1400+"]
 };
 const BRANDS = ["Honda","Kawasaki","Yamaha","Suzuki","Triumph","Ducati","Aprilia","KTM","BMW","MV Agusta","Norton","BSA","Royal Enfield","Harley Davidson","Husqvarna","Bajaj","TVS","Hero","Jawa"];
+const POWER_GROUPS = ["0-15hp","15-30hp","30-47hp","47-100hp","100-150hp","150-200hp","200-250hp"];
+const TORQUE_GROUPS = ["0-15nm","15-30nm","30-60nm","60-90nm","90-130nm","130-160nm"];
+const TOPSPEED_GROUPS = ["100+","120+","160+","200+","240+","300+"];
 
 let bikes = [];
-let filters = { body:new Set(), cc:new Set(), brand:new Set() };
+let filters = { body:new Set(), cc:new Set(), brand:new Set(), power:new Set(), torque:new Set(), topspeed:new Set() };
 let compareSet = new Set();
 let pendingImages = [];
 let pendingFiles = [];
@@ -396,14 +424,47 @@ buildCheckList("cc-commuter", ENGINE_GROUPS.Commuter, "cc", ccLabel);
 buildCheckList("cc-lightweight", ENGINE_GROUPS.Lightweight, "cc", ccLabel);
 buildCheckList("cc-middleweight", ENGINE_GROUPS.Middleweight, "cc", ccLabel);
 buildCheckList("cc-heavyweight", ENGINE_GROUPS.Heavyweight, "cc", ccLabel);
+buildCheckList("power-list", POWER_GROUPS, "power");
+buildCheckList("torque-list", TORQUE_GROUPS, "torque");
+buildCheckList("topspeed-list", TOPSPEED_GROUPS, "topspeed");
 buildCheckList("brand-list", BRANDS, "brand");
 
+// ---- Accordion: filter groups start closed, click heading to expand ----
+document.querySelectorAll(".filter-group > h3").forEach(h => {
+  h.addEventListener("click", () => {
+    h.closest(".filter-group").classList.toggle("open");
+  });
+});
+
+// ---- Range helpers for power/torque/top speed filters ----
+function parseBounds(label){
+  const nums = (label.match(/\d+(\.\d+)?/g) || []).map(Number);
+  if(label.includes('+')) return [nums[0], Infinity];
+  if(nums.length >= 2) return [nums[0], nums[1]];
+  return [nums[0], nums[0]];
+}
+function firstNumber(text){
+  if(!text) return null;
+  const m = String(text).match(/\d+(\.\d+)?/);
+  return m ? Number(m[0]) : null;
+}
+function matchesRangeFilter(selectedLabels, rawValue){
+  if(!selectedLabels.size) return true;
+  const val = firstNumber(rawValue);
+  if(val === null) return false;
+  return [...selectedLabels].some(label => {
+    const [lo, hi] = parseBounds(label);
+    return val >= lo && val <= hi;
+  });
+}
+
 document.getElementById("clearFilters").addEventListener("click", () => {
-  filters = { body:new Set(), cc:new Set(), brand:new Set() };
+  filters = { body:new Set(), cc:new Set(), brand:new Set(), power:new Set(), torque:new Set(), topspeed:new Set() };
   document.querySelectorAll("aside input[type=checkbox]").forEach(cb => {
     cb.checked = false;
     cb.closest(".check-row").classList.remove("checked");
   });
+  document.querySelectorAll(".filter-group").forEach(g => g.classList.remove("open"));
   render();
 });
 
@@ -489,6 +550,9 @@ function render(){
     if(filters.body.size && !filters.body.has(b.body)) return false;
     if(filters.cc.size && !filters.cc.has(b.cc)) return false;
     if(filters.brand.size && !filters.brand.has(b.brand)) return false;
+    if(!matchesRangeFilter(filters.power, b.power)) return false;
+    if(!matchesRangeFilter(filters.torque, b.torque)) return false;
+    if(!matchesRangeFilter(filters.topspeed, b.topSpeed)) return false;
     return true;
   });
 
