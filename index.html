@@ -194,6 +194,8 @@
   .field-error{color:var(--accent); font-size:12px; margin-top:6px; display:none;}
 
   .mobile-filter-btn{display:none;}
+  .sidebar-header{display:none;}
+  .sidebar-backdrop{display:none;}
 
   @media (max-width:860px){
     .layout{flex-direction:column;}
@@ -206,6 +208,19 @@
       display:block; background:var(--surface-2); border:1px solid var(--border); color:var(--text);
       padding:9px 14px; border-radius:4px; font-size:13px; cursor:pointer; margin:16px 28px 0;
     }
+    .sidebar-header{
+      display:flex; align-items:center; justify-content:space-between;
+      margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid var(--border);
+    }
+    .sidebar-header span{font-family:'Oswald',sans-serif; text-transform:uppercase; letter-spacing:1px; font-size:14px;}
+    .sidebar-close{
+      background:none; border:1px solid var(--border); color:var(--text);
+      width:30px; height:30px; border-radius:4px; cursor:pointer; font-size:16px; line-height:1;
+    }
+    .sidebar-close:hover{border-color:var(--accent); color:var(--accent);}
+    .sidebar-backdrop.show{
+      display:block; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:85;
+    }
   }
 </style>
 </head>
@@ -217,9 +232,14 @@
 </header>
 
 <button class="mobile-filter-btn" id="toggleFilters">Filters</button>
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
 <div class="layout">
   <aside id="sidebar">
+    <div class="sidebar-header">
+      <span>Filters</span>
+      <button class="sidebar-close" id="closeFilters">✕</button>
+    </div>
     <div class="filter-group">
       <h3>Body Type</h3>
       <div class="subgroup">
@@ -337,8 +357,8 @@ const BODY_TYPES = {
   Sports: ["Supersport / Super","Naked","Dual Sport / Adventure","Special bike"]
 };
 const ENGINE_GROUPS = {
-  Commuter: [100,110,150,160,180,200,250],
-  Lightweight: [250,300,350,400,450,500],
+  Commuter: ["100-110","150-180","200-250"],
+  Lightweight: ["300-400","400-500"],
   Middleweight: ["600-699","700-799","800-899","900-990"],
   Heavyweight: ["1000-1100","1100-1400","1400+"]
 };
@@ -365,6 +385,7 @@ function buildCheckList(container, values, filterKey, labelFn){
       else filters[filterKey].delete(String(v));
       row.classList.toggle("checked", e.target.checked);
       render();
+      if(window.innerWidth <= 860) setSidebarOpen(false);
     });
     el.appendChild(row);
   });
@@ -691,9 +712,13 @@ document.getElementById("saveBike").addEventListener("click", async () => {
 });
 
 // ---- Mobile filter toggle ----
-document.getElementById("toggleFilters").addEventListener("click", () => {
-  document.getElementById("sidebar").classList.toggle("open");
-});
+function setSidebarOpen(isOpen){
+  document.getElementById("sidebar").classList.toggle("open", isOpen);
+  document.getElementById("sidebarBackdrop").classList.toggle("show", isOpen);
+}
+document.getElementById("toggleFilters").addEventListener("click", () => setSidebarOpen(true));
+document.getElementById("closeFilters").addEventListener("click", () => setSidebarOpen(false));
+document.getElementById("sidebarBackdrop").addEventListener("click", () => setSidebarOpen(false));
 
 loadBikes();
 </script>
