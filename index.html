@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Moto Catalog</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#121316;
+    --surface:#1B1D22;
+    --surface-2:#22252B;
+    --border:#2C2F36;
+    --text:#F2F1ED;
+    --muted:#8B8F98;
+    --accent:#E8502A;
+    --accent-dim:#5A2216;
+    --gauge:#D9A73B;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+  }
+  .mono{font-family:'JetBrains Mono',monospace;}
+  .display{font-family:'Oswald',sans-serif;}
+
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:20px 28px;
+    border-bottom:1px solid var(--border);
+    position:sticky; top:0; background:var(--bg); z-index:10;
+  }
+  header h1{
+    font-family:'Oswald',sans-serif; font-weight:600; font-size:22px;
+    letter-spacing:0.5px; text-transform:uppercase;
+  }
+  header h1 span{color:var(--accent);}
+  header .count{
+    font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--muted);
+    margin-left:12px;
+  }
+  .add-btn{
+    background:var(--accent); color:#fff; border:none;
+    padding:10px 18px; border-radius:4px; font-weight:600; font-size:14px;
+    cursor:pointer; font-family:'Inter',sans-serif;
+    box-shadow:0 0 0 rgba(232,80,42,0.5); transition:box-shadow .2s, transform .1s;
+  }
+  .add-btn:hover{box-shadow:0 0 18px rgba(232,80,42,0.55); transform:translateY(-1px);}
+
+  .layout{display:flex; max-width:1280px; margin:0 auto;}
+
+  aside{
+    width:260px; min-width:260px; padding:24px 20px;
+    border-right:1px solid var(--border);
+    height:calc(100vh - 73px); overflow-y:auto; position:sticky; top:73px;
+  }
+  .filter-group{margin-bottom:10px;}
+  .filter-group > h3{
+    font-family:'Oswald',sans-serif; font-size:13px; letter-spacing:1px;
+    text-transform:uppercase; color:var(--muted); margin-bottom:0;
+    border-bottom:1px solid var(--border); padding:10px 2px;
+    display:flex; align-items:center; justify-content:space-between; cursor:pointer;
+  }
+  .filter-group > h3:hover{color:var(--accent);}
+  .filter-group > h3 .chev{transition:transform .15s; font-size:11px;}
+  .filter-group.open > h3 .chev{transform:rotate(180deg);}
+  .filter-group .group-content{display:none; padding-top:12px;}
+  .filter-group.open .group-content{display:block;}
+  .subgroup{margin-bottom:14px;}
+  .subgroup > .sublabel{
+    font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--gauge);
+    text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; display:block;
+  }
+  .check-row{
+    display:flex; align-items:center; gap:8px; padding:4px 0; cursor:pointer;
+    font-size:13.5px; color:var(--text);
+  }
+  .check-row input{accent-color:var(--accent); width:14px; height:14px; cursor:pointer;}
+  .check-row:hover{color:var(--accent);}
+  .check-row.checked{color:var(--accent); text-shadow:0 0 8px rgba(232,80,42,0.4);}
+  .clear-btn{
+    background:none; border:1px solid var(--border); color:var(--muted);
+    font-size:12px; padding:6px 10px; border-radius:4px; cursor:pointer; margin-top:4px;
+  }
+  .clear-btn:hover{border-color:var(--accent); color:var(--accent);}
+
+  main{flex:1; padding:24px 28px;}
+  .grid{
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:18px;
+  }
+  .card{
+    background:var(--surface); border:1px solid var(--border); border-radius:6px;
+    overflow:hidden; display:flex; flex-direction:column;
+    transition:border-color .15s, transform .15s;
+  }
+  .card:hover{border-color:var(--accent); transform:translateY(-2px);}
+  .card .img-wrap{
+    width:100%; aspect-ratio:4/3; background:var(--surface-2);
+    display:flex; align-items:center; justify-content:center; overflow:hidden;
+  }
+  .card .img-wrap img{width:100%; height:100%; object-fit:cover;}
+  .card .img-wrap .placeholder{color:var(--muted); font-size:12px; font-family:'JetBrains Mono',monospace;}
+  .card .info{padding:12px 14px;}
+  .card .name{font-family:'Oswald',sans-serif; font-size:16px; font-weight:500; margin-bottom:6px;}
+  .card .tags{display:flex; flex-wrap:wrap; gap:6px; align-items:center;}
+  .tag{
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; padding:3px 7px;
+    border-radius:3px; background:var(--surface-2); color:var(--muted); border:1px solid var(--border);
+  }
+  .tag.cc{color:var(--gauge); border-color:rgba(217,167,59,0.3);}
+  .tag.brand{color:var(--text);}
+  .tag.price{color:var(--accent); border-color:rgba(232,80,42,0.35); font-weight:600;}
+  .card .del{
+    margin-top:10px; background:none; border:none; color:var(--muted);
+    font-size:11px; cursor:pointer; text-decoration:underline; padding:0;
+  }
+  .card .del:hover{color:var(--accent);}
+  .card .card-actions{display:flex; align-items:center; justify-content:space-between; margin-top:10px;}
+  .card .view-btn{
+    background:none; border:1px solid var(--border); color:var(--text);
+    font-size:11px; padding:5px 9px; border-radius:4px; cursor:pointer;
+  }
+  .card .view-btn:hover{border-color:var(--accent); color:var(--accent);}
+  .compare-check{display:flex; align-items:center; gap:5px; font-size:11px; color:var(--muted); cursor:pointer;}
+  .compare-check input{accent-color:var(--accent); cursor:pointer;}
+
+  .compare-bar{
+    position:fixed; bottom:0; left:0; right:0; background:var(--surface);
+    border-top:1px solid var(--accent); padding:14px 20px; display:none;
+    align-items:center; justify-content:space-between; z-index:80;
+    box-shadow:0 -6px 20px rgba(0,0,0,0.4);
+  }
+  .compare-bar.show{display:flex;}
+  .compare-bar span{font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--muted);}
+  .compare-bar .btns{display:flex; gap:10px;}
+  .compare-bar button{padding:9px 16px; border-radius:4px; font-size:13px; cursor:pointer; border:none; font-family:'Inter',sans-serif;}
+  .compare-bar .go{background:var(--accent); color:#fff; font-weight:600;}
+  .compare-bar .clear{background:none; border:1px solid var(--border); color:var(--muted);}
+
+  .detail-modal{max-width:520px;}
+  .detail-gallery{display:flex; gap:8px; overflow-x:auto; margin-bottom:16px;}
+  .detail-gallery img{width:140px; height:105px; object-fit:cover; border-radius:4px; flex-shrink:0; background:var(--surface-2);}
+  .detail-modal h2{margin-bottom:6px;}
+  .detail-modal .tags{margin-bottom:16px;}
+  .spec-table{width:100%; border-collapse:collapse; margin-top:8px;}
+  .spec-table td{padding:9px 6px; border-bottom:1px solid var(--border); font-size:13.5px;}
+  .spec-table td:first-child{color:var(--muted); font-family:'JetBrains Mono',monospace; font-size:11.5px; text-transform:uppercase;}
+
+  .compare-modal{max-width:900px; width:100%;}
+  .compare-table{width:100%; border-collapse:collapse;}
+  .compare-table th, .compare-table td{padding:10px; border:1px solid var(--border); text-align:left; font-size:13px; vertical-align:top;}
+  .compare-table th{font-family:'Oswald',sans-serif; text-transform:uppercase; letter-spacing:0.5px; font-size:13px;}
+  .compare-table td.label{color:var(--muted); font-family:'JetBrains Mono',monospace; font-size:11px; text-transform:uppercase;}
+  .compare-table img{width:100%; max-width:160px; aspect-ratio:4/3; object-fit:cover; border-radius:4px;}
+  .compare-table-wrap{overflow-x:auto;}
+
+  .empty{
+    text-align:center; padding:80px 20px; color:var(--muted);
+  }
+  .empty h2{font-family:'Oswald',sans-serif; color:var(--text); font-size:20px; margin-bottom:8px;}
+  .empty button{margin-top:16px;}
+
+  /* Modal */
+  .overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,0.6);
+    display:none; align-items:center; justify-content:center; z-index:100; padding:20px;
+  }
+  .overlay.open{display:flex;}
+  .modal{
+    background:var(--surface); border:1px solid var(--border); border-radius:8px;
+    width:100%; max-width:420px; padding:24px; max-height:90vh; overflow-y:auto;
+  }
+  .modal h2{font-family:'Oswald',sans-serif; font-size:18px; margin-bottom:18px; text-transform:uppercase; letter-spacing:0.5px;}
+  .field{margin-bottom:16px;}
+  .field label{display:block; font-size:12px; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; font-family:'JetBrains Mono',monospace;}
+  .field input[type=text], .field select{
+    width:100%; padding:9px 10px; background:var(--surface-2); border:1px solid var(--border);
+    color:var(--text); border-radius:4px; font-size:14px; font-family:'Inter',sans-serif;
+  }
+  .field input[type=text]:focus, .field select:focus{outline:none; border-color:var(--accent);}
+  .img-upload{
+    border:1px dashed var(--border); border-radius:4px; padding:16px; text-align:center;
+    cursor:pointer; color:var(--muted); font-size:13px;
+  }
+  .img-upload:hover{border-color:var(--accent); color:var(--accent);}
+  .img-preview{width:100%; max-height:160px; object-fit:cover; border-radius:4px; margin-top:10px;}
+  .modal-actions{display:flex; gap:10px; margin-top:20px;}
+  .modal-actions button{
+    flex:1; padding:11px; border-radius:4px; font-weight:600; cursor:pointer; font-size:14px;
+    font-family:'Inter',sans-serif; border:none;
+  }
+  .btn-save{background:var(--accent); color:#fff;}
+  .btn-cancel{background:none; border:1px solid var(--border); color:var(--muted);}
+  .btn-cancel:hover{color:var(--text);}
+  .field-error{color:var(--accent); font-size:12px; margin-top:6px; display:none;}
+
+  .mobile-filter-btn{display:none;}
+  .sidebar-header{display:none;}
+  .sidebar-backdrop{display:none;}
+
+  @media (max-width:860px){
+    .layout{flex-direction:column;}
+    aside{
+      position:fixed; top:0; left:0; height:100vh; width:280px; z-index:90;
+      transform:translateX(-100%); transition:transform .2s; background:var(--bg);
+    }
+    aside.open{transform:translateX(0);}
+    .mobile-filter-btn{
+      display:block; background:var(--surface-2); border:1px solid var(--border); color:var(--text);
+      padding:9px 14px; border-radius:4px; font-size:13px; cursor:pointer; margin:16px 28px 0;
+    }
+    .sidebar-header{
+      display:flex; align-items:center; justify-content:space-between;
+      margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid var(--border);
+    }
+    .sidebar-header span{font-family:'Oswald',sans-serif; text-transform:uppercase; letter-spacing:1px; font-size:14px;}
+    .sidebar-close{
+      background:none; border:1px solid var(--border); color:var(--text);
+      width:30px; height:30px; border-radius:4px; cursor:pointer; font-size:16px; line-height:1;
+    }
+    .sidebar-close:hover{border-color:var(--accent); color:var(--accent);}
+    .sidebar-backdrop.show{
+      display:block; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:85;
+    }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Moto<span>Catalog</span><span class="count mono" id="resultCount"></span></h1>
+  <button class="add-btn" id="openAdd">+ Add bike</button>
+</header>
+
+<button class="mobile-filter-btn" id="toggleFilters">Filters</button>
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+<div class="layout">
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <span>Filters</span>
+      <button class="sidebar-close" id="closeFilters">✕</button>
+    </div>
+    <div class="filter-group">
+      <h3>Body Type <span class="chev">▾</span></h3>
+      <div class="group-content">
+        <div class="subgroup">
+          <span class="sublabel">Retro</span>
+          <div id="body-retro"></div>
+        </div>
+        <div class="subgroup">
+          <span class="sublabel">Sports</span>
+          <div id="body-sports"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <h3>Engine Size <span class="chev">▾</span></h3>
+      <div class="group-content">
+        <div class="subgroup">
+          <span class="sublabel">Commuter</span>
+          <div id="cc-commuter"></div>
+        </div>
+        <div class="subgroup">
+          <span class="sublabel">Beginner</span>
+          <div id="cc-beginner"></div>
+        </div>
+        <div class="subgroup">
+          <span class="sublabel">Middleweight</span>
+          <div id="cc-middleweight"></div>
+        </div>
+        <div class="subgroup">
+          <span class="sublabel">Heavyweight</span>
+          <div id="cc-heavyweight"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <h3>Power <span class="chev">▾</span></h3>
+      <div class="group-content"><div id="power-list"></div></div>
+    </div>
+
+    <div class="filter-group">
+      <h3>Torque <span class="chev">▾</span></h3>
+      <div class="group-content"><div id="torque-list"></div></div>
+    </div>
+
+    <div class="filter-group">
+      <h3>Top Speed <span class="chev">▾</span></h3>
+      <div class="group-content"><div id="topspeed-list"></div></div>
+    </div>
+
+    <div class="filter-group">
+      <h3>Brand <span class="chev">▾</span></h3>
+      <div class="group-content"><div id="brand-list"></div></div>
+    </div>
+
+    <button class="clear-btn" id="clearFilters">Clear all filters</button>
+  </aside>
+
+  <main>
+    <div class="grid" id="grid"></div>
+    <div class="empty" id="emptyState" style="display:none;">
+      <h2 id="emptyTitle">No bikes yet</h2>
+      <p id="emptyText">Add your first bike to start building the catalog.</p>
+      <button class="add-btn" id="emptyAddBtn">+ Add bike</button>
+    </div>
+  </main>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2>Add a bike</h2>
+    <div class="field">
+      <label>Name</label>
+      <input type="text" id="f-name" placeholder="e.g. Duke 390">
+    </div>
+    <div class="field">
+      <label>Body type</label>
+      <select id="f-body"></select>
+    </div>
+    <div class="field">
+      <label>Engine size (cc)</label>
+      <select id="f-cc"></select>
+    </div>
+    <div class="field">
+      <label>Brand</label>
+      <select id="f-brand"></select>
+    </div>
+    <div class="field">
+      <label>Power (optional)</label>
+      <input type="text" id="f-power" placeholder="e.g. 43 bhp">
+    </div>
+    <div class="field">
+      <label>Torque (optional)</label>
+      <input type="text" id="f-torque" placeholder="e.g. 37 Nm">
+    </div>
+    <div class="field">
+      <label>Top speed (optional)</label>
+      <input type="text" id="f-topspeed" placeholder="e.g. 165 km/h">
+    </div>
+    <div class="field">
+      <label>Ex-showroom price (optional)</label>
+      <input type="text" id="f-price" placeholder="e.g. ₹1,85,000">
+    </div>
+    <div class="field">
+      <label>Photos</label>
+      <div class="img-upload" id="uploadZone">Click to upload one or more photos</div>
+      <input type="file" id="f-image" accept="image/*" multiple style="display:none;">
+      <div id="imgPreviewWrap" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;"></div>
+    </div>
+    <div class="field-error" id="formError">Please fill in the bike's name and photo.</div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="cancelAdd">Cancel</button>
+      <button class="btn-save" id="saveBike">Save bike</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="detailOverlay">
+  <div class="modal detail-modal" id="detailContent"></div>
+</div>
+
+<div class="overlay" id="compareOverlay">
+  <div class="modal compare-modal" id="compareContent"></div>
+</div>
+
+<div class="compare-bar" id="compareBar">
+  <span id="compareCount">0 selected</span>
+  <div class="btns">
+    <button class="clear" id="compareClearBtn">Clear</button>
+    <button class="go" id="compareGoBtn">Compare</button>
+  </div>
+</div>
+
+<script>
+const BODY_TYPES = {
+  Retro: ["Cruiser","Standard","Cafe Racer","Scrambler"],
+  Sports: ["Supersport / Super","Naked","Dual Sport / Adventure","Special bike"]
+};
+const ENGINE_GROUPS = {
+  Commuter: ["100","125","150-199","200-249"],
+  Beginner: ["250-299","300-399","400-500"],
+  Middleweight: ["600-699","700-799","800-899","900-990"],
+  Heavyweight: ["1000-1100","1100-1400","1400+"]
+};
+const BRANDS = ["Honda","Kawasaki","Yamaha","Suzuki","Triumph","Ducati","Aprilia","KTM","BMW","MV Agusta","Norton","BSA","Royal Enfield","Harley Davidson","Husqvarna","Bajaj","TVS","Hero","Jawa"];
+const POWER_GROUPS = ["0-15hp","15-30hp","30-47hp","47-100hp","100-150hp","150-200hp","200-250hp"];
+const TORQUE_GROUPS = ["0-15nm","15-30nm","30-60nm","60-90nm","90-130nm","130-160nm"];
+const TOPSPEED_GROUPS = ["100+","120+","160+","200+","240+","300+"];
+
+let bikes = [];
+let filters = { body:new Set(), cc:new Set(), brand:new Set(), power:new Set(), torque:new Set(), topspeed:new Set() };
+let compareSet = new Set();
+let pendingImages = [];
+let pendingFiles = [];
+
+function ccLabel(v){ return typeof v === "number" ? v + "cc" : v + "cc"; }
+
+// ---- Build sidebar ----
+function buildCheckList(container, values, filterKey, labelFn, valueFn){
+  const el = document.getElementById(container);
+  values.forEach(v => {
+    const label = labelFn ? labelFn(v) : v;
+    const storedValue = valueFn ? valueFn(v) : v;
+    const row = document.createElement("label");
+    row.className = "check-row";
+    row.innerHTML = `<input type="checkbox" value="${storedValue}"> <span>${label}</span>`;
+    row.querySelector("input").addEventListener("change", (e) => {
+      if(e.target.checked) filters[filterKey].add(String(storedValue));
+      else filters[filterKey].delete(String(storedValue));
+      row.classList.toggle("checked", e.target.checked);
+      render();
+      if(window.innerWidth <= 860) setSidebarOpen(false);
+    });
+    el.appendChild(row);
+  });
+}
+buildCheckList("body-retro", BODY_TYPES.Retro, "body");
+buildCheckList("body-sports", BODY_TYPES.Sports, "body");
+buildCheckList("cc-commuter", ENGINE_GROUPS.Commuter, "cc", ccLabel, ccLabel);
+buildCheckList("cc-beginner", ENGINE_GROUPS.Beginner, "cc", ccLabel, ccLabel);
+buildCheckList("cc-middleweight", ENGINE_GROUPS.Middleweight, "cc", ccLabel, ccLabel);
+buildCheckList("cc-heavyweight", ENGINE_GROUPS.Heavyweight, "cc", ccLabel, ccLabel);
+buildCheckList("power-list", POWER_GROUPS, "power");
+buildCheckList("torque-list", TORQUE_GROUPS, "torque");
+buildCheckList("topspeed-list", TOPSPEED_GROUPS, "topspeed");
+buildCheckList("brand-list", BRANDS, "brand");
+
+// ---- Accordion: filter groups start closed, click heading to expand ----
+document.querySelectorAll(".filter-group > h3").forEach(h => {
+  h.addEventListener("click", () => {
+    h.closest(".filter-group").classList.toggle("open");
+  });
+});
+
+// ---- Range helpers for power/torque/top speed filters ----
+function parseBounds(label){
+  const nums = (label.match(/\d+(\.\d+)?/g) || []).map(Number);
+  if(label.includes('+')) return [nums[0], Infinity];
+  if(nums.length >= 2) return [nums[0], nums[1]];
+  return [nums[0], nums[0]];
+}
+function firstNumber(text){
+  if(!text) return null;
+  const m = String(text).match(/\d+(\.\d+)?/);
+  return m ? Number(m[0]) : null;
+}
+function matchesRangeFilter(selectedLabels, rawValue){
+  if(!selectedLabels.size) return true;
+  const val = firstNumber(rawValue);
+  if(val === null) return false;
+  return [...selectedLabels].some(label => {
+    const [lo, hi] = parseBounds(label);
+    return val >= lo && val <= hi;
+  });
+}
+
+document.getElementById("clearFilters").addEventListener("click", () => {
+  filters = { body:new Set(), cc:new Set(), brand:new Set(), power:new Set(), torque:new Set(), topspeed:new Set() };
+  document.querySelectorAll("aside input[type=checkbox]").forEach(cb => {
+    cb.checked = false;
+    cb.closest(".check-row").classList.remove("checked");
+  });
+  document.querySelectorAll(".filter-group").forEach(g => g.classList.remove("open"));
+  render();
+});
+
+// ---- Populate modal selects ----
+function fillSelect(id, groups){
+  const sel = document.getElementById(id);
+  Object.entries(groups).forEach(([groupName, items]) => {
+    const og = document.createElement("optgroup");
+    og.label = groupName;
+    items.forEach(v => {
+      const opt = document.createElement("option");
+      opt.value = typeof v === "number" ? v+"cc" : (id === "f-cc" ? v+"cc" : v);
+      opt.textContent = id === "f-cc" ? ccLabel(v) : v;
+      og.appendChild(opt);
+    });
+    sel.appendChild(og);
+  });
+}
+fillSelect("f-body", BODY_TYPES);
+fillSelect("f-cc", ENGINE_GROUPS);
+BRANDS.forEach(b => {
+  const opt = document.createElement("option");
+  opt.value = b; opt.textContent = b;
+  document.getElementById("f-brand").appendChild(opt);
+});
+
+// ---- Supabase connection ----
+const SUPABASE_URL = "https://maqiemcffmymxxrbyuqo.supabase.co";
+const SUPABASE_KEY = "sb_publishable_fY_QfJgPfq1BH2eptZbH4A_muea2zQq";
+const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+async function loadBikes(){
+  try{
+    const { data, error } = await sbClient.from('bikes').select('*').order('created_at', { ascending:false });
+    if(error) throw error;
+    bikes = (data || []).map(row => ({
+      id: String(row.id),
+      name: row["Name"],
+      body: row["Body type"],
+      cc: row["Engine size"],
+      brand: row["Brand name"],
+      images: row["Images"] ? row["Images"].split(',').filter(Boolean) : [],
+      power: row["Power"],
+      torque: row["Torque"],
+      topSpeed: row["Top speed"],
+      price: row["Ex-showroom price"]
+    }));
+  }catch(e){
+    console.error("Load error", e);
+    bikes = [];
+  }
+  render();
+}
+
+async function uploadImages(files){
+  const urls = [];
+  for(const file of files){
+    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}-${file.name}`;
+    const { error } = await sbClient.storage.from('BIKE Photos').upload(path, file);
+    if(error){ console.error("Upload error", error); continue; }
+    const { data } = sbClient.storage.from('BIKE Photos').getPublicUrl(path);
+    if(data && data.publicUrl) urls.push(data.publicUrl);
+  }
+  return urls;
+}
+
+async function deleteBike(id){
+  try{
+    const { error } = await sbClient.from('bikes').delete().eq('id', Number(id));
+    if(error) throw error;
+  }catch(e){
+    console.error("Delete error", e);
+    alert("Couldn't remove that bike — check your connection and try again.");
+  }
+}
+
+// ---- Render ----
+function render(){
+  const grid = document.getElementById("grid");
+  const empty = document.getElementById("emptyState");
+  grid.innerHTML = "";
+
+  const filtered = bikes.filter(b => {
+    if(filters.body.size && !filters.body.has(b.body)) return false;
+    if(filters.cc.size && !filters.cc.has(b.cc)) return false;
+    if(filters.brand.size && !filters.brand.has(b.brand)) return false;
+    if(!matchesRangeFilter(filters.power, b.power)) return false;
+    if(!matchesRangeFilter(filters.torque, b.torque)) return false;
+    if(!matchesRangeFilter(filters.topspeed, b.topSpeed)) return false;
+    return true;
+  });
+
+  document.getElementById("resultCount").textContent = bikes.length ? `${filtered.length}/${bikes.length}` : "";
+
+  if(bikes.length === 0){
+    empty.style.display = "block";
+    document.getElementById("emptyTitle").textContent = "No bikes yet";
+    document.getElementById("emptyText").textContent = "Add your first bike to start building the catalog.";
+    document.getElementById("emptyAddBtn").style.display = "inline-block";
+    return;
+  }
+  if(filtered.length === 0){
+    empty.style.display = "block";
+    document.getElementById("emptyTitle").textContent = "No matches";
+    document.getElementById("emptyText").textContent = "No bikes match the selected filters.";
+    document.getElementById("emptyAddBtn").style.display = "none";
+    return;
+  }
+  empty.style.display = "none";
+
+  filtered.forEach(b => {
+    const imgs = b.images && b.images.length ? b.images : (b.image ? [b.image] : []);
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <div class="img-wrap">
+        ${imgs[0] ? `<img src="${imgs[0]}" alt="${b.name}">` : `<span class="placeholder">no photo</span>`}
+      </div>
+      <div class="info">
+        <div class="name">${b.name}</div>
+        <div class="tags">
+          <span class="tag">${b.body}</span>
+          <span class="tag cc">${b.cc}</span>
+          <span class="tag brand">${b.brand}</span>
+          ${b.price ? `<span class="tag price">${b.price}</span>` : ""}
+        </div>
+        <div class="card-actions">
+          <button class="view-btn" data-id="${b.id}">Details</button>
+          <label class="compare-check">
+            <input type="checkbox" class="cmp-cb" data-id="${b.id}" ${compareSet.has(b.id) ? "checked" : ""}>
+            Compare
+          </label>
+        </div>
+        <button class="del" data-id="${b.id}">Remove</button>
+      </div>
+    `;
+    card.querySelector(".del").addEventListener("click", async (e) => {
+      const id = e.target.dataset.id;
+      e.target.textContent = "Removing...";
+      await deleteBike(id);
+      compareSet.delete(id);
+      await loadBikes();
+      updateCompareBar();
+    });
+    card.querySelector(".view-btn").addEventListener("click", () => openDetail(b.id));
+    card.querySelector(".cmp-cb").addEventListener("change", (e) => {
+      const id = e.target.dataset.id;
+      if(e.target.checked){
+        if(compareSet.size >= 3){ e.target.checked = false; alert("You can compare up to 3 bikes at a time."); return; }
+        compareSet.add(id);
+      } else {
+        compareSet.delete(id);
+      }
+      updateCompareBar();
+    });
+    grid.appendChild(card);
+  });
+}
+
+// ---- Detail modal ----
+const detailOverlay = document.getElementById("detailOverlay");
+function openDetail(id){
+  const b = bikes.find(x => x.id === id);
+  if(!b) return;
+  const imgs = b.images && b.images.length ? b.images : (b.image ? [b.image] : []);
+  document.getElementById("detailContent").innerHTML = `
+    <div class="detail-gallery">
+      ${imgs.length ? imgs.map(src => `<img src="${src}">`).join("") : `<span class="placeholder">no photos</span>`}
+    </div>
+    <h2>${b.name}</h2>
+    <div class="tags">
+      <span class="tag">${b.body}</span>
+      <span class="tag cc">${b.cc}</span>
+      <span class="tag brand">${b.brand}</span>
+    </div>
+    <table class="spec-table">
+      <tr><td>Body type</td><td>${b.body}</td></tr>
+      <tr><td>Engine size</td><td>${b.cc}</td></tr>
+      <tr><td>Brand</td><td>${b.brand}</td></tr>
+      ${b.power ? `<tr><td>Power</td><td>${b.power}</td></tr>` : ""}
+      ${b.torque ? `<tr><td>Torque</td><td>${b.torque}</td></tr>` : ""}
+      ${b.topSpeed ? `<tr><td>Top speed</td><td>${b.topSpeed}</td></tr>` : ""}
+      ${b.price ? `<tr><td>Ex-showroom price</td><td>${b.price}</td></tr>` : ""}
+    </table>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="closeDetail">Close</button>
+    </div>
+  `;
+  document.getElementById("closeDetail").addEventListener("click", () => detailOverlay.classList.remove("open"));
+  detailOverlay.classList.add("open");
+}
+detailOverlay.addEventListener("click", (e) => { if(e.target === detailOverlay) detailOverlay.classList.remove("open"); });
+
+// ---- Compare feature ----
+function updateCompareBar(){
+  const bar = document.getElementById("compareBar");
+  document.getElementById("compareCount").textContent = `${compareSet.size} selected (max 3)`;
+  bar.classList.toggle("show", compareSet.size > 0);
+}
+document.getElementById("compareClearBtn").addEventListener("click", () => {
+  compareSet.clear();
+  render();
+  updateCompareBar();
+});
+const compareOverlay = document.getElementById("compareOverlay");
+document.getElementById("compareGoBtn").addEventListener("click", () => {
+  const selected = bikes.filter(b => compareSet.has(b.id));
+  if(selected.length < 2){ alert("Select at least 2 bikes to compare."); return; }
+  const rows = [
+    ["Photo", b => { const imgs = b.images && b.images.length ? b.images : (b.image ? [b.image] : []); return imgs[0] ? `<img src="${imgs[0]}">` : "no photo"; }],
+    ["Body type", b => b.body],
+    ["Engine size", b => b.cc],
+    ["Brand", b => b.brand],
+    ["Power", b => b.power || "—"],
+    ["Torque", b => b.torque || "—"],
+    ["Top speed", b => b.topSpeed || "—"],
+    ["Price", b => b.price || "—"],
+  ];
+  document.getElementById("compareContent").innerHTML = `
+    <h2>Compare bikes</h2>
+    <div class="compare-table-wrap">
+      <table class="compare-table">
+        <tr><th></th>${selected.map(b => `<th>${b.name}</th>`).join("")}</tr>
+        ${rows.map(([label, fn]) => `<tr><td class="label">${label}</td>${selected.map(b => `<td>${fn(b)}</td>`).join("")}</tr>`).join("")}
+      </table>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="closeCompare">Close</button>
+    </div>
+  `;
+  document.getElementById("closeCompare").addEventListener("click", () => compareOverlay.classList.remove("open"));
+  compareOverlay.classList.add("open");
+});
+compareOverlay.addEventListener("click", (e) => { if(e.target === compareOverlay) compareOverlay.classList.remove("open"); });
+
+// ---- Modal ----
+const overlay = document.getElementById("overlay");
+function openModal(){
+  document.getElementById("f-name").value = "";
+  document.getElementById("f-power").value = "";
+  document.getElementById("f-torque").value = "";
+  document.getElementById("f-topspeed").value = "";
+  document.getElementById("f-price").value = "";
+  document.getElementById("f-image").value = "";
+  document.getElementById("imgPreviewWrap").innerHTML = "";
+  pendingImages = [];
+  pendingFiles = [];
+  document.getElementById("formError").style.display = "none";
+  overlay.classList.add("open");
+}
+function closeModal(){ overlay.classList.remove("open"); }
+
+document.getElementById("openAdd").addEventListener("click", openModal);
+document.getElementById("emptyAddBtn").addEventListener("click", openModal);
+document.getElementById("cancelAdd").addEventListener("click", closeModal);
+overlay.addEventListener("click", (e) => { if(e.target === overlay) closeModal(); });
+
+document.getElementById("uploadZone").addEventListener("click", () => document.getElementById("f-image").click());
+document.getElementById("f-image").addEventListener("change", (e) => {
+  const files = Array.from(e.target.files);
+  const wrap = document.getElementById("imgPreviewWrap");
+  files.forEach(file => {
+    pendingFiles.push(file);
+    const reader = new FileReader();
+    reader.onload = () => {
+      pendingImages.push(reader.result);
+      const img = document.createElement("img");
+      img.src = reader.result;
+      img.className = "img-preview";
+      img.style.width = "80px"; img.style.height = "60px";
+      wrap.appendChild(img);
+    };
+    reader.readAsDataURL(file);
+  });
+});
+
+document.getElementById("saveBike").addEventListener("click", async () => {
+  const name = document.getElementById("f-name").value.trim();
+  const body = document.getElementById("f-body").value;
+  const cc = document.getElementById("f-cc").value;
+  const brand = document.getElementById("f-brand").value;
+  const power = document.getElementById("f-power").value.trim();
+  const torque = document.getElementById("f-torque").value.trim();
+  const topSpeed = document.getElementById("f-topspeed").value.trim();
+  const price = document.getElementById("f-price").value.trim();
+
+  if(!name){
+    const err = document.getElementById("formError");
+    err.textContent = "Please enter a bike name.";
+    err.style.display = "block";
+    return;
+  }
+
+  const saveBtn = document.getElementById("saveBike");
+  saveBtn.disabled = true;
+  saveBtn.textContent = "Saving...";
+  try{
+    const urls = await uploadImages(pendingFiles);
+    const { error } = await sbClient.from('bikes').insert({
+      "Name": name,
+      "Body type": body,
+      "Engine size": cc,
+      "Brand name": brand,
+      "Images": urls.join(','),
+      "Power": power || null,
+      "Torque": torque || null,
+      "Top speed": topSpeed || null,
+      "Ex-showroom price": price || null
+    });
+    if(error) throw error;
+    await loadBikes();
+    closeModal();
+  }catch(e){
+    console.error("Save error", e);
+    alert("Couldn't save this bike — check your connection and try again.");
+  }
+  saveBtn.disabled = false;
+  saveBtn.textContent = "Save bike";
+});
+
+// ---- Mobile filter toggle ----
+function setSidebarOpen(isOpen){
+  document.getElementById("sidebar").classList.toggle("open", isOpen);
+  document.getElementById("sidebarBackdrop").classList.toggle("show", isOpen);
+}
+document.getElementById("toggleFilters").addEventListener("click", () => setSidebarOpen(true));
+document.getElementById("closeFilters").addEventListener("click", () => setSidebarOpen(false));
+document.getElementById("sidebarBackdrop").addEventListener("click", () => setSidebarOpen(false));
+
+loadBikes();
+</script>
+</body>
+</html>
