@@ -6,6 +6,7 @@
 <title>Moto Catalog</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --bg:#121316;
@@ -113,6 +114,44 @@
     font-size:11px; cursor:pointer; text-decoration:underline; padding:0;
   }
   .card .del:hover{color:var(--accent);}
+  .card .card-actions{display:flex; align-items:center; justify-content:space-between; margin-top:10px;}
+  .card .view-btn{
+    background:none; border:1px solid var(--border); color:var(--text);
+    font-size:11px; padding:5px 9px; border-radius:4px; cursor:pointer;
+  }
+  .card .view-btn:hover{border-color:var(--accent); color:var(--accent);}
+  .compare-check{display:flex; align-items:center; gap:5px; font-size:11px; color:var(--muted); cursor:pointer;}
+  .compare-check input{accent-color:var(--accent); cursor:pointer;}
+
+  .compare-bar{
+    position:fixed; bottom:0; left:0; right:0; background:var(--surface);
+    border-top:1px solid var(--accent); padding:14px 20px; display:none;
+    align-items:center; justify-content:space-between; z-index:80;
+    box-shadow:0 -6px 20px rgba(0,0,0,0.4);
+  }
+  .compare-bar.show{display:flex;}
+  .compare-bar span{font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--muted);}
+  .compare-bar .btns{display:flex; gap:10px;}
+  .compare-bar button{padding:9px 16px; border-radius:4px; font-size:13px; cursor:pointer; border:none; font-family:'Inter',sans-serif;}
+  .compare-bar .go{background:var(--accent); color:#fff; font-weight:600;}
+  .compare-bar .clear{background:none; border:1px solid var(--border); color:var(--muted);}
+
+  .detail-modal{max-width:520px;}
+  .detail-gallery{display:flex; gap:8px; overflow-x:auto; margin-bottom:16px;}
+  .detail-gallery img{width:140px; height:105px; object-fit:cover; border-radius:4px; flex-shrink:0; background:var(--surface-2);}
+  .detail-modal h2{margin-bottom:6px;}
+  .detail-modal .tags{margin-bottom:16px;}
+  .spec-table{width:100%; border-collapse:collapse; margin-top:8px;}
+  .spec-table td{padding:9px 6px; border-bottom:1px solid var(--border); font-size:13.5px;}
+  .spec-table td:first-child{color:var(--muted); font-family:'JetBrains Mono',monospace; font-size:11.5px; text-transform:uppercase;}
+
+  .compare-modal{max-width:900px; width:100%;}
+  .compare-table{width:100%; border-collapse:collapse;}
+  .compare-table th, .compare-table td{padding:10px; border:1px solid var(--border); text-align:left; font-size:13px; vertical-align:top;}
+  .compare-table th{font-family:'Oswald',sans-serif; text-transform:uppercase; letter-spacing:0.5px; font-size:13px;}
+  .compare-table td.label{color:var(--muted); font-family:'JetBrains Mono',monospace; font-size:11px; text-transform:uppercase;}
+  .compare-table img{width:100%; max-width:160px; aspect-ratio:4/3; object-fit:cover; border-radius:4px;}
+  .compare-table-wrap{overflow-x:auto;}
 
   .empty{
     text-align:center; padding:80px 20px; color:var(--muted);
@@ -251,16 +290,44 @@
       <select id="f-brand"></select>
     </div>
     <div class="field">
-      <label>Photo</label>
-      <div class="img-upload" id="uploadZone">Click to upload a photo</div>
-      <input type="file" id="f-image" accept="image/*" style="display:none;">
-      <img id="imgPreview" class="img-preview" style="display:none;">
+      <label>Power (optional)</label>
+      <input type="text" id="f-power" placeholder="e.g. 43 bhp">
+    </div>
+    <div class="field">
+      <label>Torque (optional)</label>
+      <input type="text" id="f-torque" placeholder="e.g. 37 Nm">
+    </div>
+    <div class="field">
+      <label>Top speed (optional)</label>
+      <input type="text" id="f-topspeed" placeholder="e.g. 165 km/h">
+    </div>
+    <div class="field">
+      <label>Photos</label>
+      <div class="img-upload" id="uploadZone">Click to upload one or more photos</div>
+      <input type="file" id="f-image" accept="image/*" multiple style="display:none;">
+      <div id="imgPreviewWrap" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;"></div>
     </div>
     <div class="field-error" id="formError">Please fill in the bike's name and photo.</div>
     <div class="modal-actions">
       <button class="btn-cancel" id="cancelAdd">Cancel</button>
       <button class="btn-save" id="saveBike">Save bike</button>
     </div>
+  </div>
+</div>
+
+<div class="overlay" id="detailOverlay">
+  <div class="modal detail-modal" id="detailContent"></div>
+</div>
+
+<div class="overlay" id="compareOverlay">
+  <div class="modal compare-modal" id="compareContent"></div>
+</div>
+
+<div class="compare-bar" id="compareBar">
+  <span id="compareCount">0 selected</span>
+  <div class="btns">
+    <button class="clear" id="compareClearBtn">Clear</button>
+    <button class="go" id="compareGoBtn">Compare</button>
   </div>
 </div>
 
@@ -279,6 +346,9 @@ const BRANDS = ["Honda","Kawasaki","Yamaha","Suzuki","Triumph","Ducati","Aprilia
 
 let bikes = [];
 let filters = { body:new Set(), cc:new Set(), brand:new Set() };
+let compareSet = new Set();
+let pendingImages = [];
+let pendingFiles = [];
 
 function ccLabel(v){ return typeof v === "number" ? v + "cc" : v + "cc"; }
 
@@ -339,62 +409,52 @@ BRANDS.forEach(b => {
   document.getElementById("f-brand").appendChild(opt);
 });
 
-// ---- Storage ----
-// Uses IndexedDB (much higher capacity than localStorage) since this page
-// runs as a standalone file in your browser (bikes are saved on this device/browser only).
-const DB_NAME = "motoCatalogDB";
-const STORE = "kv";
-function openDB(){
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => { req.result.createObjectStore(STORE); };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-async function idbGet(key){
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, "readonly");
-    const req = tx.objectStore(STORE).get(key);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-async function idbSet(key, value){
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, "readwrite");
-    tx.objectStore(STORE).put(value, key);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
+// ---- Supabase connection ----
+const SUPABASE_URL = "https://maqiemcffmymxxrbyuqo.supabase.co";
+const SUPABASE_KEY = "sb_publishable_fY_QfJgPfq1BH2eptZbH4A_muea2zQq";
+const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 async function loadBikes(){
   try{
-    let data = await idbGet("bikes");
-    if(!data){
-      // one-time migration from the old localStorage version, if present
-      const raw = localStorage.getItem("moto-catalog-bikes");
-      if(raw){
-        data = JSON.parse(raw);
-        await idbSet("bikes", data);
-        localStorage.removeItem("moto-catalog-bikes");
-      }
-    }
-    bikes = data || [];
+    const { data, error } = await sbClient.from('bikes').select('*').order('created_at', { ascending:false });
+    if(error) throw error;
+    bikes = (data || []).map(row => ({
+      id: String(row.id),
+      name: row.name,
+      body: row.body,
+      cc: row.cc,
+      brand: row.brand,
+      images: row.images ? row.images.split(',').filter(Boolean) : [],
+      power: row.power,
+      torque: row.torque,
+      topSpeed: row.top_speed
+    }));
   }catch(e){
-    console.error("Storage error", e);
+    console.error("Load error", e);
     bikes = [];
   }
   render();
 }
-async function saveBikes(){
+
+async function uploadImages(files){
+  const urls = [];
+  for(const file of files){
+    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}-${file.name}`;
+    const { error } = await sbClient.storage.from('bike-photos').upload(path, file);
+    if(error){ console.error("Upload error", error); continue; }
+    const { data } = sbClient.storage.from('bike-photos').getPublicUrl(path);
+    if(data && data.publicUrl) urls.push(data.publicUrl);
+  }
+  return urls;
+}
+
+async function deleteBike(id){
   try{
-    await idbSet("bikes", bikes);
+    const { error } = await sbClient.from('bikes').delete().eq('id', Number(id));
+    if(error) throw error;
   }catch(e){
-    console.error("Storage error", e);
-    alert("Couldn't save — your browser storage may be full.");
+    console.error("Delete error", e);
+    alert("Couldn't remove that bike — check your connection and try again.");
   }
 }
 
@@ -430,11 +490,12 @@ function render(){
   empty.style.display = "none";
 
   filtered.forEach(b => {
+    const imgs = b.images && b.images.length ? b.images : (b.image ? [b.image] : []);
     const card = document.createElement("div");
     card.className = "card";
     card.innerHTML = `
       <div class="img-wrap">
-        ${b.image ? `<img src="${b.image}" alt="${b.name}">` : `<span class="placeholder">no photo</span>`}
+        ${imgs[0] ? `<img src="${imgs[0]}" alt="${b.name}">` : `<span class="placeholder">no photo</span>`}
       </div>
       <div class="info">
         <div class="name">${b.name}</div>
@@ -443,25 +504,124 @@ function render(){
           <span class="tag cc">${b.cc}</span>
           <span class="tag brand">${b.brand}</span>
         </div>
+        <div class="card-actions">
+          <button class="view-btn" data-id="${b.id}">Details</button>
+          <label class="compare-check">
+            <input type="checkbox" class="cmp-cb" data-id="${b.id}" ${compareSet.has(b.id) ? "checked" : ""}>
+            Compare
+          </label>
+        </div>
         <button class="del" data-id="${b.id}">Remove</button>
       </div>
     `;
     card.querySelector(".del").addEventListener("click", async (e) => {
-      bikes = bikes.filter(x => x.id !== e.target.dataset.id);
-      await saveBikes();
-      render();
+      const id = e.target.dataset.id;
+      e.target.textContent = "Removing...";
+      await deleteBike(id);
+      compareSet.delete(id);
+      await loadBikes();
+      updateCompareBar();
+    });
+    card.querySelector(".view-btn").addEventListener("click", () => openDetail(b.id));
+    card.querySelector(".cmp-cb").addEventListener("change", (e) => {
+      const id = e.target.dataset.id;
+      if(e.target.checked){
+        if(compareSet.size >= 3){ e.target.checked = false; alert("You can compare up to 3 bikes at a time."); return; }
+        compareSet.add(id);
+      } else {
+        compareSet.delete(id);
+      }
+      updateCompareBar();
     });
     grid.appendChild(card);
   });
 }
 
+// ---- Detail modal ----
+const detailOverlay = document.getElementById("detailOverlay");
+function openDetail(id){
+  const b = bikes.find(x => x.id === id);
+  if(!b) return;
+  const imgs = b.images && b.images.length ? b.images : (b.image ? [b.image] : []);
+  document.getElementById("detailContent").innerHTML = `
+    <div class="detail-gallery">
+      ${imgs.length ? imgs.map(src => `<img src="${src}">`).join("") : `<span class="placeholder">no photos</span>`}
+    </div>
+    <h2>${b.name}</h2>
+    <div class="tags">
+      <span class="tag">${b.body}</span>
+      <span class="tag cc">${b.cc}</span>
+      <span class="tag brand">${b.brand}</span>
+    </div>
+    <table class="spec-table">
+      <tr><td>Body type</td><td>${b.body}</td></tr>
+      <tr><td>Engine size</td><td>${b.cc}</td></tr>
+      <tr><td>Brand</td><td>${b.brand}</td></tr>
+      ${b.power ? `<tr><td>Power</td><td>${b.power}</td></tr>` : ""}
+      ${b.torque ? `<tr><td>Torque</td><td>${b.torque}</td></tr>` : ""}
+      ${b.topSpeed ? `<tr><td>Top speed</td><td>${b.topSpeed}</td></tr>` : ""}
+    </table>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="closeDetail">Close</button>
+    </div>
+  `;
+  document.getElementById("closeDetail").addEventListener("click", () => detailOverlay.classList.remove("open"));
+  detailOverlay.classList.add("open");
+}
+detailOverlay.addEventListener("click", (e) => { if(e.target === detailOverlay) detailOverlay.classList.remove("open"); });
+
+// ---- Compare feature ----
+function updateCompareBar(){
+  const bar = document.getElementById("compareBar");
+  document.getElementById("compareCount").textContent = `${compareSet.size} selected (max 3)`;
+  bar.classList.toggle("show", compareSet.size > 0);
+}
+document.getElementById("compareClearBtn").addEventListener("click", () => {
+  compareSet.clear();
+  render();
+  updateCompareBar();
+});
+const compareOverlay = document.getElementById("compareOverlay");
+document.getElementById("compareGoBtn").addEventListener("click", () => {
+  const selected = bikes.filter(b => compareSet.has(b.id));
+  if(selected.length < 2){ alert("Select at least 2 bikes to compare."); return; }
+  const rows = [
+    ["Photo", b => { const imgs = b.images && b.images.length ? b.images : (b.image ? [b.image] : []); return imgs[0] ? `<img src="${imgs[0]}">` : "no photo"; }],
+    ["Body type", b => b.body],
+    ["Engine size", b => b.cc],
+    ["Brand", b => b.brand],
+    ["Power", b => b.power || "—"],
+    ["Torque", b => b.torque || "—"],
+    ["Top speed", b => b.topSpeed || "—"],
+  ];
+  document.getElementById("compareContent").innerHTML = `
+    <h2>Compare bikes</h2>
+    <div class="compare-table-wrap">
+      <table class="compare-table">
+        <tr><th></th>${selected.map(b => `<th>${b.name}</th>`).join("")}</tr>
+        ${rows.map(([label, fn]) => `<tr><td class="label">${label}</td>${selected.map(b => `<td>${fn(b)}</td>`).join("")}</tr>`).join("")}
+      </table>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="closeCompare">Close</button>
+    </div>
+  `;
+  document.getElementById("closeCompare").addEventListener("click", () => compareOverlay.classList.remove("open"));
+  compareOverlay.classList.add("open");
+});
+compareOverlay.addEventListener("click", (e) => { if(e.target === compareOverlay) compareOverlay.classList.remove("open"); });
+
 // ---- Modal ----
 const overlay = document.getElementById("overlay");
 function openModal(){
   document.getElementById("f-name").value = "";
+  document.getElementById("f-power").value = "";
+  document.getElementById("f-torque").value = "";
+  document.getElementById("f-topspeed").value = "";
   document.getElementById("f-image").value = "";
-  document.getElementById("imgPreview").style.display = "none";
-  document.getElementById("imgPreview").src = "";
+  document.getElementById("imgPreviewWrap").innerHTML = "";
+  pendingImages = [];
+  pendingFiles = [];
   document.getElementById("formError").style.display = "none";
   overlay.classList.add("open");
 }
@@ -474,15 +634,21 @@ overlay.addEventListener("click", (e) => { if(e.target === overlay) closeModal()
 
 document.getElementById("uploadZone").addEventListener("click", () => document.getElementById("f-image").click());
 document.getElementById("f-image").addEventListener("change", (e) => {
-  const file = e.target.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    const preview = document.getElementById("imgPreview");
-    preview.src = reader.result;
-    preview.style.display = "block";
-  };
-  reader.readAsDataURL(file);
+  const files = Array.from(e.target.files);
+  const wrap = document.getElementById("imgPreviewWrap");
+  files.forEach(file => {
+    pendingFiles.push(file);
+    const reader = new FileReader();
+    reader.onload = () => {
+      pendingImages.push(reader.result);
+      const img = document.createElement("img");
+      img.src = reader.result;
+      img.className = "img-preview";
+      img.style.width = "80px"; img.style.height = "60px";
+      wrap.appendChild(img);
+    };
+    reader.readAsDataURL(file);
+  });
 });
 
 document.getElementById("saveBike").addEventListener("click", async () => {
@@ -490,8 +656,9 @@ document.getElementById("saveBike").addEventListener("click", async () => {
   const body = document.getElementById("f-body").value;
   const cc = document.getElementById("f-cc").value;
   const brand = document.getElementById("f-brand").value;
-  const image = document.getElementById("imgPreview").src && document.getElementById("imgPreview").style.display !== "none"
-    ? document.getElementById("imgPreview").src : null;
+  const power = document.getElementById("f-power").value.trim();
+  const torque = document.getElementById("f-torque").value.trim();
+  const topSpeed = document.getElementById("f-topspeed").value.trim();
 
   if(!name){
     const err = document.getElementById("formError");
@@ -500,11 +667,27 @@ document.getElementById("saveBike").addEventListener("click", async () => {
     return;
   }
 
-  const bike = { id: Date.now().toString(36)+Math.random().toString(36).slice(2), name, body, cc, brand, image };
-  bikes.push(bike);
-  await saveBikes();
-  closeModal();
-  render();
+  const saveBtn = document.getElementById("saveBike");
+  saveBtn.disabled = true;
+  saveBtn.textContent = "Saving...";
+  try{
+    const urls = await uploadImages(pendingFiles);
+    const { error } = await sbClient.from('bikes').insert({
+      name, body, cc, brand,
+      images: urls.join(','),
+      power: power || null,
+      torque: torque || null,
+      top_speed: topSpeed || null
+    });
+    if(error) throw error;
+    await loadBikes();
+    closeModal();
+  }catch(e){
+    console.error("Save error", e);
+    alert("Couldn't save this bike — check your connection and try again.");
+  }
+  saveBtn.disabled = false;
+  saveBtn.textContent = "Save bike";
 });
 
 // ---- Mobile filter toggle ----
@@ -516,4 +699,3 @@ loadBikes();
 </script>
 </body>
 </html>
-
