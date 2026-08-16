@@ -318,7 +318,7 @@
 
 <div class="overlay" id="overlay">
   <div class="modal">
-    <h2>Add a bike</h2>
+    <h2 id="modalTitle">Add a bike</h2>
     <div class="field">
       <label>Name</label>
       <input type="text" id="f-name" placeholder="e.g. Duke 390">
@@ -329,7 +329,7 @@
     </div>
     <div class="field">
       <label>Engine size (cc)</label>
-      <select id="f-cc"></select>
+      <input type="text" id="f-cc" placeholder="e.g. 373cc">
     </div>
     <div class="field">
       <label>Brand</label>
@@ -402,6 +402,7 @@ let filters = { body:new Set(), cc:new Set(), brand:new Set(), power:new Set(), 
 let compareSet = new Set();
 let pendingImages = [];
 let pendingFiles = [];
+let editingId = null;
 
 function ccLabel(v){ return typeof v === "number" ? v + "cc" : v + "cc"; }
 
@@ -490,7 +491,6 @@ function fillSelect(id, groups){
   });
 }
 fillSelect("f-body", BODY_TYPES);
-fillSelect("f-cc", ENGINE_GROUPS);
 BRANDS.forEach(b => {
   const opt = document.createElement("option");
   opt.value = b; opt.textContent = b;
@@ -555,7 +555,7 @@ function render(){
 
   const filtered = bikes.filter(b => {
     if(filters.body.size && !filters.body.has(b.body)) return false;
-    if(filters.cc.size && !filters.cc.has(b.cc)) return false;
+    if(!matchesRangeFilter(filters.cc, b.cc)) return false;
     if(filters.brand.size && !filters.brand.has(b.brand)) return false;
     if(!matchesRangeFilter(filters.power, b.power)) return false;
     if(!matchesRangeFilter(filters.torque, b.torque)) return false;
@@ -599,6 +599,7 @@ function render(){
         </div>
         <div class="card-actions">
           <button class="view-btn" data-id="${b.id}">Details</button>
+          <button class="view-btn" data-edit-id="${b.id}">Edit</button>
           <label class="compare-check">
             <input type="checkbox" class="cmp-cb" data-id="${b.id}" ${compareSet.has(b.id) ? "checked" : ""}>
             Compare
@@ -615,7 +616,8 @@ function render(){
       await loadBikes();
       updateCompareBar();
     });
-    card.querySelector(".view-btn").addEventListener("click", () => openDetail(b.id));
+    card.querySelector(".view-btn[data-id]").addEventListener("click", () => openDetail(b.id));
+    card.querySelector(".view-btn[data-edit-id]").addEventListener("click", () => openEditModal(b.id));
     card.querySelector(".cmp-cb").addEventListener("change", (e) => {
       const id = e.target.dataset.id;
       if(e.target.checked){
@@ -709,11 +711,38 @@ compareOverlay.addEventListener("click", (e) => { if(e.target === compareOverlay
 // ---- Modal ----
 const overlay = document.getElementById("overlay");
 function openModal(){
+  editingId = null;
+  document.getElementById("modalTitle").textContent = "Add a bike";
+  document.getElementById("saveBike").textContent = "Save bike";
   document.getElementById("f-name").value = "";
+  document.getElementById("f-body").selectedIndex = 0;
+  document.getElementById("f-cc").value = "";
+  document.getElementById("f-brand").selectedIndex = 0;
   document.getElementById("f-power").value = "";
   document.getElementById("f-torque").value = "";
   document.getElementById("f-topspeed").value = "";
   document.getElementById("f-price").value = "";
+  document.getElementById("f-image").value = "";
+  document.getElementById("imgPreviewWrap").innerHTML = "";
+  pendingImages = [];
+  pendingFiles = [];
+  document.getElementById("formError").style.display = "none";
+  overlay.classList.add("open");
+}
+function openEditModal(id){
+  const b = bikes.find(x => x.id === id);
+  if(!b) return;
+  editingId = id;
+  document.getElementById("modalTitle").textContent = "Edit bike";
+  document.getElementById("saveBike").textContent = "Save changes";
+  document.getElementById("f-name").value = b.name || "";
+  document.getElementById("f-body").value = b.body || "";
+  document.getElementById("f-cc").value = b.cc || "";
+  document.getElementById("f-brand").value = b.brand || "";
+  document.getElementById("f-power").value = b.power || "";
+  document.getElementById("f-torque").value = b.torque || "";
+  document.getElementById("f-topspeed").value = b.topSpeed || "";
+  document.getElementById("f-price").value = b.price || "";
   document.getElementById("f-image").value = "";
   document.getElementById("imgPreviewWrap").innerHTML = "";
   pendingImages = [];
@@ -768,19 +797,39 @@ document.getElementById("saveBike").addEventListener("click", async () => {
   saveBtn.disabled = true;
   saveBtn.textContent = "Saving...";
   try{
-    const urls = await uploadImages(pendingFiles);
-    const { error } = await sbClient.from('bikes').insert({
-      "Name": name,
-      "Body type": body,
-      "Engine size": cc,
-      "Brand name": brand,
-      "Images": urls.join(','),
-      "Power": power || null,
-      "Torque": torque || null,
-      "Top speed": topSpeed || null,
-      "Ex-showroom price": price || null
-    });
-    if(error) throw error;
+    const newUrls = await uploadImages(pendingFiles);
+
+    if(editingId){
+      // Editing an existing bike: keep its current photos and add any newly uploaded ones
+      const existing = bikes.find(x => x.id === editingId);
+      const existingImages = existing && existing.images ? existing.images : [];
+      const combinedImages = [...existingImages, ...newUrls];
+      const { error } = await sbClient.from('bikes').update({
+        "Name": name,
+        "Body type": body,
+        "Engine size": cc,
+        "Brand name": brand,
+        "Images": combinedImages.join(','),
+        "Power": power || null,
+        "Torque": torque || null,
+        "Top speed": topSpeed || null,
+        "Ex-showroom price": price || null
+      }).eq('id', Number(editingId));
+      if(error) throw error;
+    } else {
+      const { error } = await sbClient.from('bikes').insert({
+        "Name": name,
+        "Body type": body,
+        "Engine size": cc,
+        "Brand name": brand,
+        "Images": newUrls.join(','),
+        "Power": power || null,
+        "Torque": torque || null,
+        "Top speed": topSpeed || null,
+        "Ex-showroom price": price || null
+      });
+      if(error) throw error;
+    }
     await loadBikes();
     closeModal();
   }catch(e){
@@ -788,7 +837,7 @@ document.getElementById("saveBike").addEventListener("click", async () => {
     alert("Couldn't save this bike — check your connection and try again.");
   }
   saveBtn.disabled = false;
-  saveBtn.textContent = "Save bike";
+  saveBtn.textContent = editingId ? "Save changes" : "Save bike";
 });
 
 // ---- Mobile filter toggle ----
