@@ -115,6 +115,7 @@
   }
   .tag.cc{color:var(--gauge); border-color:rgba(217,167,59,0.3);}
   .tag.brand{color:var(--text);}
+  .tag.price{color:var(--accent); border-color:rgba(232,80,42,0.35); font-weight:600;}
   .card .del{
     margin-top:10px; background:none; border:none; color:var(--muted);
     font-size:11px; cursor:pointer; text-decoration:underline; padding:0;
@@ -268,8 +269,8 @@
           <div id="cc-commuter"></div>
         </div>
         <div class="subgroup">
-          <span class="sublabel">Lightweight</span>
-          <div id="cc-lightweight"></div>
+          <span class="sublabel">Beginner</span>
+          <div id="cc-beginner"></div>
         </div>
         <div class="subgroup">
           <span class="sublabel">Middleweight</span>
@@ -347,6 +348,10 @@
       <input type="text" id="f-topspeed" placeholder="e.g. 165 km/h">
     </div>
     <div class="field">
+      <label>Ex-showroom price (optional)</label>
+      <input type="text" id="f-price" placeholder="e.g. ₹1,85,000">
+    </div>
+    <div class="field">
       <label>Photos</label>
       <div class="img-upload" id="uploadZone">Click to upload one or more photos</div>
       <input type="file" id="f-image" accept="image/*" multiple style="display:none;">
@@ -382,8 +387,8 @@ const BODY_TYPES = {
   Sports: ["Supersport / Super","Naked","Dual Sport / Adventure","Special bike"]
 };
 const ENGINE_GROUPS = {
-  Commuter: ["100-110","150-180","200-250"],
-  Lightweight: ["300-400","400-500"],
+  Commuter: ["100","125","150-199","200-249"],
+  Beginner: ["250-299","300-399","400-500"],
   Middleweight: ["600-699","700-799","800-899","900-990"],
   Heavyweight: ["1000-1100","1100-1400","1400+"]
 };
@@ -421,7 +426,7 @@ function buildCheckList(container, values, filterKey, labelFn){
 buildCheckList("body-retro", BODY_TYPES.Retro, "body");
 buildCheckList("body-sports", BODY_TYPES.Sports, "body");
 buildCheckList("cc-commuter", ENGINE_GROUPS.Commuter, "cc", ccLabel);
-buildCheckList("cc-lightweight", ENGINE_GROUPS.Lightweight, "cc", ccLabel);
+buildCheckList("cc-beginner", ENGINE_GROUPS.Beginner, "cc", ccLabel);
 buildCheckList("cc-middleweight", ENGINE_GROUPS.Middleweight, "cc", ccLabel);
 buildCheckList("cc-heavyweight", ENGINE_GROUPS.Heavyweight, "cc", ccLabel);
 buildCheckList("power-list", POWER_GROUPS, "power");
@@ -502,14 +507,15 @@ async function loadBikes(){
     if(error) throw error;
     bikes = (data || []).map(row => ({
       id: String(row.id),
-      name: row.name,
-      body: row.body,
-      cc: row.cc,
-      brand: row.brand,
-      images: row.images ? row.images.split(',').filter(Boolean) : [],
-      power: row.power,
-      torque: row.torque,
-      topSpeed: row.top_speed
+      name: row["Name"],
+      body: row["Body type"],
+      cc: row["Engine size"],
+      brand: row["Brand name"],
+      images: row["Images"] ? row["Images"].split(',').filter(Boolean) : [],
+      power: row["Power"],
+      torque: row["Torque"],
+      topSpeed: row["Top speed"],
+      price: row["Ex-showroom price"]
     }));
   }catch(e){
     console.error("Load error", e);
@@ -588,6 +594,7 @@ function render(){
           <span class="tag">${b.body}</span>
           <span class="tag cc">${b.cc}</span>
           <span class="tag brand">${b.brand}</span>
+          ${b.price ? `<span class="tag price">${b.price}</span>` : ""}
         </div>
         <div class="card-actions">
           <button class="view-btn" data-id="${b.id}">Details</button>
@@ -645,6 +652,7 @@ function openDetail(id){
       ${b.power ? `<tr><td>Power</td><td>${b.power}</td></tr>` : ""}
       ${b.torque ? `<tr><td>Torque</td><td>${b.torque}</td></tr>` : ""}
       ${b.topSpeed ? `<tr><td>Top speed</td><td>${b.topSpeed}</td></tr>` : ""}
+      ${b.price ? `<tr><td>Ex-showroom price</td><td>${b.price}</td></tr>` : ""}
     </table>
     <div class="modal-actions">
       <button class="btn-cancel" id="closeDetail">Close</button>
@@ -678,6 +686,7 @@ document.getElementById("compareGoBtn").addEventListener("click", () => {
     ["Power", b => b.power || "—"],
     ["Torque", b => b.torque || "—"],
     ["Top speed", b => b.topSpeed || "—"],
+    ["Price", b => b.price || "—"],
   ];
   document.getElementById("compareContent").innerHTML = `
     <h2>Compare bikes</h2>
@@ -703,6 +712,7 @@ function openModal(){
   document.getElementById("f-power").value = "";
   document.getElementById("f-torque").value = "";
   document.getElementById("f-topspeed").value = "";
+  document.getElementById("f-price").value = "";
   document.getElementById("f-image").value = "";
   document.getElementById("imgPreviewWrap").innerHTML = "";
   pendingImages = [];
@@ -744,6 +754,7 @@ document.getElementById("saveBike").addEventListener("click", async () => {
   const power = document.getElementById("f-power").value.trim();
   const torque = document.getElementById("f-torque").value.trim();
   const topSpeed = document.getElementById("f-topspeed").value.trim();
+  const price = document.getElementById("f-price").value.trim();
 
   if(!name){
     const err = document.getElementById("formError");
@@ -758,11 +769,15 @@ document.getElementById("saveBike").addEventListener("click", async () => {
   try{
     const urls = await uploadImages(pendingFiles);
     const { error } = await sbClient.from('bikes').insert({
-      name, body, cc, brand,
-      images: urls.join(','),
-      power: power || null,
-      torque: torque || null,
-      top_speed: topSpeed || null
+      "Name": name,
+      "Body type": body,
+      "Engine size": cc,
+      "Brand name": brand,
+      "Images": urls.join(','),
+      "Power": power || null,
+      "Torque": torque || null,
+      "Top speed": topSpeed || null,
+      "Ex-showroom price": price || null
     });
     if(error) throw error;
     await loadBikes();
